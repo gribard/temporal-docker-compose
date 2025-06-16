@@ -1,64 +1,62 @@
-version: "3.5"
-
-x-logging: &loki-logging
-  logging:
-    driver: loki
-    options:
-      loki-url: "http://host.docker.internal:3100/loki/api/v1/push"
-      mode: non-blocking
-      max-buffer-size: 4m
-      loki-retries: "3"
+#x-logging: &loki-logging
+#  logging:
+#    driver: loki
+#    options:
+#      loki-url: "http://host.docker.internal:3100/loki/api/v1/push"
+#      mode: non-blocking
+#      max-buffer-size: 4m
+#      loki-retries: "3"
 
 services:
-  loki:
-    container_name: loki
-    image: grafana/loki:latest
-    ports:
-      - published: 3100
-        target: 3100
-    command: -config.file=/etc/loki/local-config.yaml
-    volumes:
-      - type: bind
-        source: ./deployment/loki/local-config.yaml
-        target: /etc/loki/local-config.yaml
-    depends_on:
-      - grafana
-    networks:
-      - temporal-network
+  #  loki:
+  #    container_name: loki
+  #    restart: always
+  #    image: grafana/loki:latest
+  ##    ports:
+  ##      - 3100:3100
+  #    command: -config.file=/etc/loki/local-config.yaml
+  #    volumes:
+  #      - ./deployment/loki/local-config.yaml:/etc/loki/local-config.yaml
+  #    depends_on:
+  #      - grafana
+  #    networks:
+  #    - temporal-network
 
-  elasticsearch:
-    <<: *loki-logging
-    container_name: temporal-elasticsearch
-    environment:
-      - discovery.type=single-node
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
-      - xpack.security.enabled=false
-    image: elasticsearch:${ELASTICSEARCH_VERSION}
-    ports:
-      - published: 9200
-        target: 9200
-    networks:
-      - temporal-network
+  #  elasticsearch:
+  ##    <<: *loki-logging
+  #    container_name: temporal-elasticsearch
+  #    environment:
+  #      - discovery.type=single-node
+  #      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+  #      - xpack.security.enabled=false
+  #    image: elasticsearch:${ELASTICSEARCH_VERSION}
+  #    ports:
+  #      - published: 9200
+  #        target: 9200
+  #    networks:
+  #       - temporal-network
 
   postgresql:
-    <<: *loki-logging
+    #    <<: *loki-logging
     container_name: temporal-postgresql
+    restart: always
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_USER: ${POSTGRES_USER}
     image: postgres:${POSTGRESQL_VERSION}
-    expose:
-      - ${POSTGRES_DEFAULT_PORT}
+    #    expose:
+    #      - ${POSTGRES_DEFAULT_PORT}
     volumes:
-      - /var/lib/postgresql/data
+      - temporal_postgresql_data:/var/lib/postgresql/data
     networks:
+      - kamal
       - temporal-network
 
   temporal-history:
-    <<: *loki-logging
+    #    <<: *loki-logging
     container_name: temporal-history
+    restart: always
     depends_on:
-      - elasticsearch
       - postgresql
     environment:
       - DB=postgres12
@@ -71,27 +69,25 @@ services:
       - TEMPORAL_VISIBILITY_NAMESPACEDEFAULT_ARCHIVAL_FILESTORE=enabled
       - SERVICES=history
       - PROMETHEUS_ENDPOINT=0.0.0.0:8000
-      - ENABLE_ES=true
+      - ENABLE_ES=false
       - ES_SEEDS=elasticsearch
       - ES_VERSION=v7
       - TEMPORAL_CLI_ADDRESS=temporal-nginx:7233
       - TEMPORAL_ADDRESS=temporal-nginx:7233
-    # use temporalio/auto-setup to automatically setup DB schema and namespaces
     image: temporalio/auto-setup:${TEMPORAL_VERSION}
-    ports:
-      - published: 7234
-        target: 7234
-      - published: 8000
-        target: 8000
-    restart: on-failure
+    #    ports:
+    #      - 7234:7234
+    #      - 8888:8000
     volumes:
       - ./dynamicconfig:/etc/temporal/config/dynamicconfig
     networks:
+      - kamal
       - temporal-network
 
   temporal-matching:
-    <<: *loki-logging
+    #    <<: *loki-logging
     container_name: temporal-matching
+    restart: always
     depends_on:
       - temporal-history
     environment:
@@ -105,26 +101,25 @@ services:
       - TEMPORAL_VISIBILITY_NAMESPACEDEFAULT_ARCHIVAL_FILESTORE=enabled
       - SERVICES=matching
       - PROMETHEUS_ENDPOINT=0.0.0.0:8001
-      - ENABLE_ES=true
+      - ENABLE_ES=false
       - ES_SEEDS=elasticsearch
       - ES_VERSION=v7
       - TEMPORAL_CLI_ADDRESS=temporal-nginx:7233
       - TEMPORAL_ADDRESS=temporal-nginx:7233
     image: temporalio/server:${TEMPORAL_VERSION}
-    ports:
-      - published: 7235
-        target: 7235
-      - published: 8001
-        target: 8001
-    restart: on-failure
+    #    ports:
+    #      - 7235:7235
+    #      - 8001:8001
     volumes:
       - ./dynamicconfig:/etc/temporal/config/dynamicconfig
     networks:
+      - kamal
       - temporal-network
 
   temporal-frontend:
-    <<: *loki-logging
+    #    <<: *loki-logging
     container_name: temporal-frontend
+    restart: always
     depends_on:
       - temporal-matching
     environment:
@@ -139,26 +134,25 @@ services:
       - SERVICES=frontend
       - FRONTEND_GRPC_PORT=7237
       - PROMETHEUS_ENDPOINT=0.0.0.0:8002
-      - ENABLE_ES=true
+      - ENABLE_ES=false
       - ES_SEEDS=elasticsearch
       - ES_VERSION=v7
       - TEMPORAL_CLI_ADDRESS=temporal-nginx:7233
       - TEMPORAL_ADDRESS=temporal-nginx:7233
     image: temporalio/server:${TEMPORAL_VERSION}
-    ports:
-      - published: 7237
-        target: 7237
-      - published: 8002
-        target: 8002
-    restart: on-failure
+    #    ports:
+    #      - 7237:7237
+    #      - 8002:8002
     volumes:
       - ./dynamicconfig:/etc/temporal/config/dynamicconfig
     networks:
+      - kamal
       - temporal-network
 
   temporal-frontend2:
-    <<: *loki-logging
+    #    <<: *loki-logging
     container_name: temporal-frontend2
+    restart: always
     depends_on:
       - temporal-matching
     environment:
@@ -171,31 +165,28 @@ services:
       - TEMPORAL_HISTORY_NAMESPACEDEFAULT_ARCHIVAL_FILESTORE=enabled
       - TEMPORAL_VISIBILITY_NAMESPACEDEFAULT_ARCHIVAL_FILESTORE=enabled
       - SERVICES=frontend
-      # set different frontend grpc port
       - FRONTEND_GRPC_PORT=7236
-      # set different membership port than temporal-frontend
       - FRONTEND_MEMBERSHIP_PORT=6936
       - PROMETHEUS_ENDPOINT=0.0.0.0:8004
-      - ENABLE_ES=true
+      - ENABLE_ES=false
       - ES_SEEDS=elasticsearch
       - ES_VERSION=v7
       - TEMPORAL_CLI_ADDRESS=temporal-nginx:7233
       - TEMPORAL_ADDRESS=temporal-nginx:7233
     image: temporalio/server:${TEMPORAL_VERSION}
-    ports:
-      - published: 7236
-        target: 7236
-      - published: 8004
-        target: 8004
-    restart: on-failure
+    #    ports:
+    #      - 7236:7236
+    #      - 8004:8004
     volumes:
       - ./dynamicconfig:/etc/temporal/config/dynamicconfig
     networks:
+      - kamal
       - temporal-network
 
   temporal-worker:
-    <<: *loki-logging
+    #    <<: *loki-logging
     container_name: temporal-worker
+    restart: always
     depends_on:
       - temporal-nginx
     environment:
@@ -209,28 +200,26 @@ services:
       - TEMPORAL_VISIBILITY_NAMESPACEDEFAULT_ARCHIVAL_FILESTORE=enabled
       - SERVICES=worker
       - PROMETHEUS_ENDPOINT=0.0.0.0:8003
-      # set to nginx
       - PUBLIC_FRONTEND_ADDRESS=temporal-nginx:7233
       - TEMPORAL_CLI_ADDRESS=temporal-nginx:7233
       - TEMPORAL_ADDRESS=temporal-nginx:7233
-      - ENABLE_ES=true
+      - ENABLE_ES=false
       - ES_SEEDS=elasticsearch
       - ES_VERSION=v7
     image: temporalio/server:${TEMPORAL_VERSION}
-    ports:
-      - published: 7232
-        target: 7232
-      - published: 8003
-        target: 8003
-    restart: on-failure
+    #    ports:
+    #      - 7232:7232
+    #      - 8003:8003
     volumes:
       - ./dynamicconfig:/etc/temporal/config/dynamicconfig
     networks:
+      - kamal
       - temporal-network
-  
+
   temporal-admin-tools:
-    <<: *loki-logging
+    #    <<: *loki-logging
     container_name: temporal-admin-tools
+    restart: always
     depends_on:
       - temporal-nginx
     environment:
@@ -240,92 +229,28 @@ services:
     stdin_open: true
     tty: true
     networks:
+      - kamal
       - temporal-network
 
   temporal-ui:
     container_name: temporal-ui
+    restart: always
     depends_on:
       - temporal-nginx
     environment:
       - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+      - TEMPORAL_CSRF_COOKIE_INSECURE=true
       - TEMPORAL_CLI_ADDRESS=temporal-nginx:7233
       - TEMPORAL_ADDRESS=temporal-nginx:7233
     image: temporalio/ui:${TEMPORAL_UI_VERSION}
     ports:
       - 8080:8080
     networks:
-      - temporal-network
-
-  prometheus:
-    container_name: prometheus
-    image: prom/prometheus:v2.37.0
-    ports:
-      - published: 9090
-        target: 9090
-    volumes:
-      - type: bind
-        source: ./deployment/prometheus/config.yml
-        target: /etc/prometheus/prometheus.yml
-    depends_on:
-      - temporal-worker
-    networks:
-      - temporal-network
-
-  grafana:
-    container_name: grafana
-    image: grafana/grafana:7.5.16
-    build: './deployment/grafana'
-    environment:
-      - GF_AUTH_DISABLE_LOGIN_FORM=true
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-    ports:
-      - published: 8085
-        target: 3000
-    volumes:
-      - type: bind
-        source: ./deployment/grafana/provisioning/datasources
-        target: /etc/grafana/provisioning/datasources
-    depends_on:
-      - prometheus
-    networks:
-      - temporal-network
-
-  jaeger-all-in-one:
-    image: jaegertracing/all-in-one:1.37
-    ports:
-      - published: 16686
-        target: 16686
-      - published: 14268
-        target: 14268
-      - published: 14250
-        target: 14250
-    networks:
-      - temporal-network
-
-  otel-collector:
-    image: otel/opentelemetry-collector:0.47.0
-    command: [ "--config=/etc/otel-collector-config.yaml" ]
-    volumes:
-      - type: bind
-        source: ./deployment/otel/otel-config.yaml
-        target: /etc/otel-collector-config.yaml
-    ports:
-      - published: 1888
-        target: 1888
-      - published: 13133
-        target: 13133
-      - published: 4317
-        target: 4317
-      - published: 55670
-        target: 55670
-    depends_on:
-      - jaeger-all-in-one
-    networks:
+      - kamal
       - temporal-network
 
   temporal-nginx:
-    <<: *loki-logging
+    #    <<: *loki-logging
     image: nginx:1.22.1
     container_name: temporal-nginx
     restart: unless-stopped
@@ -337,9 +262,127 @@ services:
     volumes:
       - ./deployment/nginx/nginx.conf:/etc/nginx/nginx.conf
     networks:
+      - kamal
       - temporal-network
+
+  prometheus:
+    container_name: prometheus
+    restart: unless-stopped
+    image: prom/prometheus:latest
+    ports:
+      - 9090:9090
+    volumes:
+      - ./deployment/prometheus/config.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--storage.tsdb.retention.time=200h"
+      - "--web.enable-lifecycle"
+    depends_on:
+      - temporal-worker
+      - cadvisor
+    networks:
+      - kamal
+      - temporal-network
+
+  grafana:
+    container_name: grafana
+    restart: unless-stopped
+    image: grafana/grafana:latest
+    build: './deployment/grafana'
+    environment:
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    ports:
+      - 8085:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deployment/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - kamal
+      - temporal-network
+
+  #  jaeger-all-in-one:
+  #    image: jaegertracing/all-in-one:1.37
+  #    restart: always
+  ##    ports:
+  ##      - 16686:16686
+  ##      - 14268:14268
+  ##      - 14250:14250
+  #    networks:
+  #       - temporal-network
+
+  #  otel-collector:
+  #    image: otel/opentelemetry-collector:0.47.0
+  #    restart: always
+  #    command: ["--config=/etc/otel-collector-config.yaml"]
+  #    volumes:
+  #      - ./deployment/otel/otel-config.yaml:/etc/otel-collector-config.yaml
+  ##    ports:
+  ##      - 1888:1888
+  ##      - 13133:13133
+  ##      - 4317:4317
+  ##      - 55670:55670
+  #    depends_on:
+  #      - jaeger-all-in-one
+  #    networks:
+  #     - temporal-network
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    restart: always
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - kamal
+      - temporal-network
+
+  docker_state_exporter:
+    image: karugaru/docker_state_exporter
+    restart: always
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+    networks:
+      - kamal
+      - temporal-network
+
+  nodeexporter:
+    image: prom/node-exporter:latest
+    restart: always
+    networks:
+      - kamal
+      - temporal-network
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+    depends_on:
+      - cadvisor
 
 networks:
   temporal-network:
-    driver: bridge
     name: temporal-network
+    external: true
+  kamal:
+    name: kamal
+    external: true
+
+volumes:
+  grafana_data:
+  prometheus_data:
+  temporal_postgresql_data:

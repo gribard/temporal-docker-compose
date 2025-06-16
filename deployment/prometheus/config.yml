@@ -1,41 +1,85 @@
 global:
-  scrape_interval: 10s
+  scrape_interval: 5s
 scrape_configs:
+  # cadvisor-metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: [ 'cadvisor:8080' ]
+    relabel_configs:
+      - source_labels: [ '__meta_docker_container_name' ]
+        target_label: "container_name"
+      - source_labels: [ '__meta_docker_container_id' ]
+        target_label: "container_id"
+
+  - job_name: 'docker-state-exporter'
+    static_configs:
+      - targets: [ 'docker_state_exporter:8080' ]
+
+  - job_name: 'demo-docker-server'
+    static_configs:
+      - targets: [ 'nodeexporter:9100' ]
+
   - job_name: 'temporalmetrics'
     metrics_path: /metrics
     scheme: http
     static_configs:
       # Server metrics target
       - targets:
-          - 'host.docker.internal:8000'
-          - 'host.docker.internal:8001'
-          - 'host.docker.internal:8002'
-          - 'host.docker.internal:8003'
-          - 'host.docker.internal:8004'
+          - 'temporal-history:8000' # history
+          - 'temporal-matching:8001' # matching
+          - 'temporal-frontend:8002' # frontend
+          - 'temporal-worker:8003' # worker
+          - 'temporal-frontend2:8004' # frontend2
         labels:
           group: 'server-metrics'
 
       # Local app targets (if configured)
       - targets:
-          - 'host.docker.internal:8077'
-          - 'host.docker.internal:8078'
+          - 'dfs-rss-download-worker:10001'
+          - 'dfs-rss-wayback-worker:10002'
+          - 'dfs-youtube-worker:10003'
+          - 'xfs-rss-worker:10004'
+          - 'xfs-youtube-worker:10005'
+          - 'gfs-cfw-worker:10006'
+          - 'gfs-ufw-worker:10007'
+          - 'ufs-create-feed-worker:10008'
+          - 'ufs-refresh-feed-worker:10009'
+          - 'ufs-index-worker:10010'
+          - 'shared-minio-worker:10011'
+          - 'ufs-check-feed-worker:10012'
         labels:
           group: 'sdk-metrics'
       # Docker metrics
-      - targets:
-          - 'host.docker.internal:9323'
-        labels:
-          group: 'docker-metrics'
+#      - targets:
+#          - 'host.docker.internal:9323'
+#        labels:
+#          group: 'docker-metrics'
+
       # Postgres Exporter
-      - targets:
-          - 'host.docker.internal:9187'
-        labels:
-          group: 'postgres-metrics'
-  - job_name: 'springbootjavasdk'
-    metrics_path: /actuator/prometheus
-    scheme: http
+#      - targets:
+#          - 'host.docker.internal:9187'
+#        labels:
+#          group: 'postgres-metrics'
+
+#  - job_name: 'springbootjavasdk'
+#    metrics_path: /actuator/prometheus
+#    scheme: http
+#    static_configs:
+#      - targets:
+#          - 'host.docker.internal:3030'
+#        labels:
+#          group: 'spring-boot-metrics'
+
+  - job_name: 'prometheus'
     static_configs:
       - targets:
-          - 'host.docker.internal:3030'
+          - 'prometheus:9090'
         labels:
-          group: 'spring-boot-metrics'
+          group: 'prometheus-metrics'
+
+  - job_name: 'grafana'
+    static_configs:
+      - targets:
+          - 'grafana:3000'
+        labels:
+          group: 'grafana-metrics'
