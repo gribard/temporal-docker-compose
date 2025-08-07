@@ -257,6 +257,9 @@ services:
     depends_on:
       - temporal-frontend
       - temporal-frontend2
+    environment:
+      - TEMPORAL_CLI_ADDRESS=temporal-nginx:7233
+      - TEMPORAL_ADDRESS=temporal-nginx:7233
     ports:
       - 7233:7233
     volumes:
